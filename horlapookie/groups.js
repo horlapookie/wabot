@@ -25,7 +25,7 @@ function saveBanned(banned) {
 export default {
   name: 'group',
   description: 'Group management commands: kick, ban, unban, promote, demote, tagall, warn, lock, unlock',
-  async execute(msg, { sock, args, OWNER_NUMBER }) {
+  async execute(msg, { sock, args, OWNER_NUMBER, moderators }) {
     const subcommand = args[0]?.toLowerCase();
     const remoteJid = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
@@ -36,11 +36,10 @@ export default {
       return await sock.sendMessage(remoteJid, { text: '❌ This command only works in groups.' }, { quoted: msg });
     }
 
-    const allowedNumbers = ['2349122222622', OWNER_NUMBER];
     const metadata = await sock.groupMetadata(remoteJid);
     const participants = metadata.participants;
     const admins = participants.filter(p => p.admin !== null).map(p => p.id);
-    const isSenderAdmin = admins.includes(sender) || allowedNumbers.includes(senderNumber);
+    const isSenderAdmin = admins.includes(sender) || senderNumber === OWNER_NUMBER || (moderators && moderators.includes(senderNumber));
     const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
     const botIsAdmin = participants.some(p => p.id === botNumber && (p.admin === 'admin' || p.admin === 'superadmin'));
 
@@ -77,8 +76,8 @@ export default {
       }
 
       case 'ban': {
-        if (!allowedNumbers.includes(senderNumber)) {
-          return await sock.sendMessage(remoteJid, { text: '❌ Only bot owner can ban users.' }, { quoted: msg });
+        if (senderNumber !== OWNER_NUMBER && !(moderators && moderators.includes(senderNumber))) {
+          return await sock.sendMessage(remoteJid, { text: '❌ Only bot owner or moderators can ban users.' }, { quoted: msg });
         }
 
         let userToBan = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] ||
@@ -105,8 +104,8 @@ export default {
       }
 
       case 'unban': {
-        if (!allowedNumbers.includes(senderNumber)) {
-          return await sock.sendMessage(remoteJid, { text: '❌ Only bot owner can unban users.' }, { quoted: msg });
+        if (senderNumber !== OWNER_NUMBER && !(moderators && moderators.includes(senderNumber))) {
+          return await sock.sendMessage(remoteJid, { text: '❌ Only bot owner or moderators can unban users.' }, { quoted: msg });
         }
 
         let userToUnban = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] ||
@@ -182,11 +181,11 @@ export default {
       }
 
       case 'tagall': {
-        if (!allowedNumbers.includes(senderNumber)) {
+        if (senderNumber !== OWNER_NUMBER && !(moderators && moderators.includes(senderNumber))) {
           return await sock.sendMessage(remoteJid, { text: '❌ You are not allowed to use this command.' }, { quoted: msg });
         }
 
-        const ownerNumber = allowedNumbers[0] + '@s.whatsapp.net';
+        const ownerNumber = OWNER_NUMBER + '@s.whatsapp.net';
         const owners = [];
         const botUsers = [];
         const groupAdmins = [];

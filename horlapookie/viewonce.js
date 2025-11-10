@@ -9,9 +9,10 @@ export default {
     const senderNumber = senderJid.split("@")[0];
 
     const isOwner = senderNumber === OWNER_NUMBER;
-    const isMod = moderators.includes(senderNumber);
+    const isMod = moderators && moderators.includes(senderNumber);
 
     if (!isOwner && !isMod) {
+      console.log(`[viewonce] Access denied - Sender: ${senderNumber}, Owner: ${OWNER_NUMBER}, Moderators:`, moderators);
       await sock.sendMessage(
         msg.key.remoteJid,
         { text: "❌ Only the owner or a moderator can use this command." },

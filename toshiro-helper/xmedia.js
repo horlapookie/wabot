@@ -100,13 +100,33 @@ export async function downloadXvideo(link) {
         const scriptContent = $(script).html();
         if (!scriptContent) continue;
 
-        let match = scriptContent.match(/setVideoUrlHigh['"](.+?)['"]/);
+        // Try multiple patterns
+        let match = scriptContent.match(/setVideoUrlHigh\(['"](.+?)['"]\)/);
         if (match && match[1]) {
           videoUrl = match[1];
           break;
         }
 
-        match = scriptContent.match(/setVideoUrlLow['"](.+?)['"]/);
+        match = scriptContent.match(/setVideoUrlLow\(['"](.+?)['"]\)/);
+        if (match && match[1]) {
+          videoUrl = match[1];
+          break;
+        }
+
+        match = scriptContent.match(/setVideoHLS\(['"](.+?)['"]\)/);
+        if (match && match[1]) {
+          videoUrl = match[1];
+          break;
+        }
+
+        match = scriptContent.match(/html5player\.setVideoUrl\(['"](.+?)['"]\)/);
+        if (match && match[1]) {
+          videoUrl = match[1];
+          break;
+        }
+
+        // Look for direct .mp4 URLs in script
+        match = scriptContent.match(/(https?:\/\/[^\s'"]+\.mp4[^\s'"]*)/);
         if (match && match[1]) {
           videoUrl = match[1];
           break;
@@ -115,7 +135,8 @@ export async function downloadXvideo(link) {
     }
 
     if (!videoUrl) {
-      throw new Error('Failed to extract video URL.');
+      console.error('[xmedia] Failed to find video URL in page');
+      throw new Error('Failed to extract video URL. The website structure may have changed.');
     }
 
     const title = $('h2.page-title').text().trim() || 'xvideos_download';
