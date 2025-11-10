@@ -2,25 +2,8 @@ import { downloadMediaMessage } from "@whiskeysockets/baileys";
 
 export default {
   name: "viewonce",
-  description: "Bypass and delete view-once media (owner/mod only)",
-  onlyMod: true,
-  async execute(msg, { sock, args, moderators, OWNER_NUMBER }) {
-    const senderJid = msg.key.participant || msg.key.remoteJid;
-    const senderNumber = senderJid.split("@")[0];
-
-    const isOwner = senderNumber === OWNER_NUMBER;
-    const isMod = moderators && moderators.includes(senderNumber);
-
-    if (!isOwner && !isMod) {
-      console.log(`[viewonce] Access denied - Sender: ${senderNumber}, Owner: ${OWNER_NUMBER}, Moderators:`, moderators);
-      await sock.sendMessage(
-        msg.key.remoteJid,
-        { text: "❌ Only the owner or a moderator can use this command." },
-        { quoted: msg }
-      );
-      return;
-    }
-
+  description: "Bypass and delete view-once media",
+  async execute(msg, { sock }) {
     try {
       const ctxInfo = msg.message?.extendedTextMessage?.contextInfo;
       const quoted = ctxInfo?.quotedMessage;
