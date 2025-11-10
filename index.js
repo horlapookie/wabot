@@ -80,11 +80,17 @@ async function startBot() {
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify' || !messages.length) return;
     const msg = messages[0];
-    if (!msg.message || msg.key.fromMe) return;
+    if (!msg.message) return;
 
     const remoteJid = msg.key.remoteJid;
+    if (!remoteJid) return; // Skip if no remoteJid
+    
     const isGroup = remoteJid.endsWith('@g.us');
     const senderJid = isGroup ? msg.key.participant : remoteJid;
+    
+    // Skip if senderJid is null (status updates, etc.)
+    if (!senderJid) return;
+    
     const senderNumber = senderJid.split('@')[0];
     const banned = loadBanned();
 
@@ -113,6 +119,9 @@ async function startBot() {
 
     const args = body.slice(COMMAND_PREFIX.length).trim().split(/\s+/);
     const commandName = args.shift()?.toLowerCase();
+    
+    // Get message sender info for proper quoting
+    const isFromMe = msg.key.fromMe;
 
     // Owner can toggle bot on/off with commands
     if (commandName === 'off' && senderNumber === OWNER_NUMBER) {
