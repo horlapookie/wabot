@@ -1,0 +1,12 @@
+node_modules/
+.env
+Success/
+*.log
+.DS_Store
+banned.json
+moderators.json
+welcomeConfig.json
+usernames.json
+hangmanData.json
+warns.json
+welcome.json

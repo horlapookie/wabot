@@ -1,10 +1,8 @@
-import baileysPkg from '@whiskeysockets/baileys';
-const {
-  default: makeWASocket,
+import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
-} = baileysPkg;
+} from '@whiskeysockets/baileys';
 
 import pino from 'pino';
 import fs from 'fs';
