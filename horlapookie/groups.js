@@ -38,11 +38,7 @@ export const kick = {
     const metadata = await sock.groupMetadata(remoteJid);
     const participants = metadata.participants;
     
-    // Normalize sender JID to match participant format
-    const normalizedSender = sender.includes('@') ? sender : `${sender}@s.whatsapp.net`;
-    
-    const admins = participants.filter(p => p.admin !== null).map(p => p.id);
-    const isSenderAdmin = admins.includes(normalizedSender);
+    const isSenderAdmin = participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
     const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
     const botIsAdmin = participants.some(p => p.id === botNumber && (p.admin === 'admin' || p.admin === 'superadmin'));
 
@@ -84,7 +80,9 @@ export const ban = {
     const sender = msg.key.participant || msg.key.remoteJid;
     const senderNumber = sender.split('@')[0];
 
-    if (senderNumber !== OWNER_NUMBER && !(moderators && moderators.includes(senderNumber))) {
+    const isMod = moderators && moderators.some(mod => mod === senderNumber || mod.split('@')[0] === senderNumber);
+    
+    if (senderNumber !== OWNER_NUMBER && !isMod) {
       return await sock.sendMessage(remoteJid, { text: '❌ Only bot owner or moderators can ban users.' }, { quoted: msg });
     }
 
@@ -119,7 +117,9 @@ export const unban = {
     const sender = msg.key.participant || msg.key.remoteJid;
     const senderNumber = sender.split('@')[0];
 
-    if (senderNumber !== OWNER_NUMBER && !(moderators && moderators.includes(senderNumber))) {
+    const isMod = moderators && moderators.some(mod => mod === senderNumber || mod.split('@')[0] === senderNumber);
+    
+    if (senderNumber !== OWNER_NUMBER && !isMod) {
       return await sock.sendMessage(remoteJid, { text: '❌ Only bot owner or moderators can unban users.' }, { quoted: msg });
     }
 
@@ -267,7 +267,7 @@ export const tagall = {
 
     function buildMentions(title, emoji, users) {
       if (users.length === 0) return '';
-      const mentionsText = users.map(jid => `│ @${jid.split('@')[0]}`).join('\n');
+      const mentionsText = users.map(jid => `@${jid.split('@')[0]}`).join('\n');
       return `╭─ *${emoji} ${title}:*\n${mentionsText}\n╰────────────\n\n`;
     }
 

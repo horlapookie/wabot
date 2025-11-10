@@ -12,29 +12,10 @@ export default {
     }
 
     try {
-      // Using a free public AI API (Groq)
-      const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful AI assistant. Provide clear and concise answers.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1024
-      }, {
-        headers: {
-          'Authorization': `Bearer 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`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const answer = response.data.choices[0].message.content;
+      // Using free DuckDuckGo AI chat API
+      const response = await axios.get(`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(prompt)}&owner=Toshiro&botname=ToshiroBot`);
+      
+      const answer = response.data.response;
       await sock.sendMessage(msg.key.remoteJid, { 
         text: `🤖 *AI Response:*\n\n${answer}` 
       }, { quoted: msg });

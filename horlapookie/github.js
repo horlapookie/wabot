@@ -1,9 +1,11 @@
 
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
 
 export default {
   name: 'github',
-  description: 'Get GitHub repository info and download link',
+  description: 'Get GitHub repository info and download file',
   async execute(msg, { args, sock }) {
     const repoUrl = args[0];
     
@@ -49,13 +51,41 @@ export default {
       responseText += `🌐 *Language:* ${data.language || 'Not specified'}\n`;
       responseText += `📅 *Created:* ${new Date(data.created_at).toLocaleDateString()}\n`;
       responseText += `🔄 *Updated:* ${new Date(data.updated_at).toLocaleDateString()}\n\n`;
-      responseText += `🔗 *Repository URL:* ${data.html_url}\n`;
-      responseText += `📥 *Download ZIP:* ${downloadUrl}\n\n`;
-      responseText += `📜 *License:* ${data.license?.name || 'No license'}`;
+      responseText += `📜 *License:* ${data.license?.name || 'No license'}\n\n`;
+      responseText += `⏳ Downloading repository...`;
 
       await sock.sendMessage(msg.key.remoteJid, { 
         text: responseText 
       }, { quoted: msg });
+
+      // Download the ZIP file
+      const fileName = `${cleanRepo}-${data.default_branch}.zip`;
+      const filePath = path.join(process.cwd(), fileName);
+      
+      const writer = fs.createWriteStream(filePath);
+      const downloadResponse = await axios({
+        url: downloadUrl,
+        method: 'GET',
+        responseType: 'stream'
+      });
+
+      downloadResponse.data.pipe(writer);
+
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+
+      // Send the file
+      await sock.sendMessage(msg.key.remoteJid, {
+        document: fs.readFileSync(filePath),
+        fileName: fileName,
+        mimetype: 'application/zip',
+        caption: `📦 *${data.name}*\n\n⭐ Stars: ${data.stargazers_count.toLocaleString()}\n🍴 Forks: ${data.forks_count.toLocaleString()}`
+      }, { quoted: msg });
+
+      // Clean up
+      fs.unlinkSync(filePath);
 
     } catch (error) {
       console.error('[github] API error:', error.response?.data || error.message);

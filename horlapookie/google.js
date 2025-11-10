@@ -15,30 +15,11 @@ export default {
     }
 
     try {
-      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-      const { data } = await axios.get(searchUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
+      // Use PopCat API for Google search
+      const apiUrl = `https://api.popcat.xyz/google?q=${encodeURIComponent(query)}`;
+      const { data } = await axios.get(apiUrl);
 
-      const $ = cheerio.load(data);
-      const results = [];
-
-      // Extract search results
-      $('.g').each((i, element) => {
-        if (i >= 5) return false; // Limit to 5 results
-        
-        const title = $(element).find('h3').text();
-        const link = $(element).find('a').attr('href');
-        const snippet = $(element).find('.VwiC3b').text() || $(element).find('.lyLwlc').text();
-
-        if (title && link) {
-          results.push({ title, link, snippet });
-        }
-      });
-
-      if (results.length === 0) {
+      if (!data || !data.results || data.results.length === 0) {
         await sock.sendMessage(msg.key.remoteJid, { 
           text: '❌ No results found for your query.' 
         }, { quoted: msg });
@@ -46,11 +27,11 @@ export default {
       }
 
       let responseText = `🔍 *Google Search Results for:* ${query}\n\n`;
-      results.forEach((result, index) => {
+      data.results.slice(0, 5).forEach((result, index) => {
         responseText += `*${index + 1}. ${result.title}*\n`;
-        responseText += `🔗 ${result.link}\n`;
-        if (result.snippet) {
-          responseText += `📄 ${result.snippet}\n`;
+        responseText += `🔗 ${result.url}\n`;
+        if (result.description) {
+          responseText += `📄 ${result.description}\n`;
         }
         responseText += `\n`;
       });
