@@ -27,6 +27,14 @@ export default {
       const contact = await sock.onWhatsApp(targetJid);
       const contactName = (contact && contact[0]?.notify) || 'Unknown';
 
+      // Try to get profile picture
+      let profilePicUrl = null;
+      try {
+        profilePicUrl = await sock.profilePictureUrl(targetJid, 'image');
+      } catch (err) {
+        console.log('No profile picture available');
+      }
+
       let infoText = `ℹ️ *User Info*\n\n`;
       infoText += `👤 Number: wa.me/${targetNumber}\n`;
       infoText += `📛 Name: ${contactName}\n`;
@@ -38,10 +46,19 @@ export default {
         infoText += `✅ Not banned\n`;
       }
 
-      await sock.sendMessage(msg.key.remoteJid, {
-        text: infoText,
-        mentions: banInfo ? [ `${banInfo.by}@s.whatsapp.net` ] : [],
-      }, { quoted: msg });
+      // Send with profile picture if available
+      if (profilePicUrl) {
+        await sock.sendMessage(msg.key.remoteJid, {
+          image: { url: profilePicUrl },
+          caption: infoText,
+          mentions: banInfo ? [ `${banInfo.by}@s.whatsapp.net` ] : [],
+        }, { quoted: msg });
+      } else {
+        await sock.sendMessage(msg.key.remoteJid, {
+          text: infoText,
+          mentions: banInfo ? [ `${banInfo.by}@s.whatsapp.net` ] : [],
+        }, { quoted: msg });
+      }
 
     } catch (err) {
       await sock.sendMessage(msg.key.remoteJid, {

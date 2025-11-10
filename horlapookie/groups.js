@@ -37,8 +37,12 @@ export const kick = {
 
     const metadata = await sock.groupMetadata(remoteJid);
     const participants = metadata.participants;
+    
+    // Normalize sender JID to match participant format
+    const normalizedSender = sender.includes('@') ? sender : `${sender}@s.whatsapp.net`;
+    
     const admins = participants.filter(p => p.admin !== null).map(p => p.id);
-    const isSenderAdmin = admins.includes(sender);
+    const isSenderAdmin = admins.includes(normalizedSender);
     const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
     const botIsAdmin = participants.some(p => p.id === botNumber && (p.admin === 'admin' || p.admin === 'superadmin'));
 
@@ -263,8 +267,8 @@ export const tagall = {
 
     function buildMentions(title, emoji, users) {
       if (users.length === 0) return '';
-      const mentionsText = users.map(jid => `@${jid.split('@')[0]}`).join(' ');
-      return `*${emoji} ${title}:*\n${mentionsText}\n\n`;
+      const mentionsText = users.map(jid => `│ @${jid.split('@')[0]}`).join('\n');
+      return `╭─ *${emoji} ${title}:*\n${mentionsText}\n╰────────────\n\n`;
     }
 
     const text =

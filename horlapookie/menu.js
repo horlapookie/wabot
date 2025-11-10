@@ -12,7 +12,7 @@ export default {
 ║   *TOSHIRO MD MINI BOT*   ║
 ╚═══════════════════════╝
 
-👤 *Creator:* horlapookie & toshiro
+👤 *Owner Name:* toshiro
 📝 *Prefix:* ${prefix}
 🔢 *Total Commands:* ${totalCommands}
 
@@ -22,6 +22,8 @@ export default {
       'General': '📌',
       'Group': '👥',
       'AI': '🤖',
+      'Search Tools': '🔍',
+      'Developer Tools': '💻',
       'Media': '🎬',
       'Fun': '🎮',
       'Utility': '🔧'
