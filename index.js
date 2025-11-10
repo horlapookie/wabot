@@ -13,17 +13,48 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const COMMAND_PREFIX = '$';
-const OWNER_NUMBER = '2348028336218';
+let OWNER_NUMBER = '2348028336218'; // Default fallback
 
 const BANNED_FILE = path.join(__dirname, 'database/json/banned.json');
 const MODERATORS_FILE = path.join(__dirname, 'database/json/moderators.json');
+const CREDS_FILE = path.join(__dirname, 'auth_info/creds.json');
 
 let botActive = true;
 
+function getBotOwnerNumber() {
+  try {
+    if (fs.existsSync(CREDS_FILE)) {
+      const creds = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf-8'));
+      if (creds.me && creds.me.id) {
+        // Extract number from format "2347055517860:7@s.whatsapp.net"
+        const number = creds.me.id.split(':')[0];
+        console.log(`Bot owner number detected: ${number}`);
+        return number;
+      }
+    }
+  } catch (error) {
+    console.error('Error reading bot owner from creds.json:', error.message);
+  }
+  return OWNER_NUMBER; // Return default if can't read
+}
+
 function loadModerators() {
-  return fs.existsSync(MODERATORS_FILE)
+  const mods = fs.existsSync(MODERATORS_FILE)
     ? JSON.parse(fs.readFileSync(MODERATORS_FILE))
     : [];
+  
+  // Auto-add bot owner to moderators if not present
+  if (!mods.includes(OWNER_NUMBER)) {
+    mods.push(OWNER_NUMBER);
+    saveModerators(mods);
+    console.log(`Auto-added bot owner ${OWNER_NUMBER} to moderators`);
+  }
+  
+  return mods;
+}
+
+function saveModerators(mods) {
+  fs.writeFileSync(MODERATORS_FILE, JSON.stringify(mods, null, 2));
 }
 
 function loadBanned() {
@@ -55,6 +86,9 @@ for (const file of commandFiles) {
 }
 
 async function startBot() {
+  // Detect and set bot owner number from creds
+  OWNER_NUMBER = getBotOwnerNumber();
+  
   const sessionFolder = path.join(__dirname, 'auth_info');
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
   const { version } = await fetchLatestBaileysVersion();
