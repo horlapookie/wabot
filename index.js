@@ -15,19 +15,9 @@ const __dirname = path.dirname(__filename);
 const COMMAND_PREFIX = '$';
 const OWNER_NUMBER = '2348028336218';
 
-const MODS_FILE = path.join(__dirname, 'moderators.json');
-const BANNED_FILE = path.join(__dirname, 'banned.json');
-const WELCOME_CONFIG_FILE = path.join(__dirname, 'welcomeConfig.json');
+const BANNED_FILE = path.join(__dirname, 'database/json/banned.json');
 
 let botActive = true;
-
-let moderators = fs.existsSync(MODS_FILE)
-  ? JSON.parse(fs.readFileSync(MODS_FILE))
-  : [];
-
-function saveModerators() {
-  fs.writeFileSync(MODS_FILE, JSON.stringify(moderators, null, 2));
-}
 
 function loadBanned() {
   return fs.existsSync(BANNED_FILE)
@@ -35,17 +25,9 @@ function loadBanned() {
     : {};
 }
 
-let welcomeConfig = fs.existsSync(WELCOME_CONFIG_FILE)
-  ? JSON.parse(fs.readFileSync(WELCOME_CONFIG_FILE))
-  : {};
-
-function saveWelcomeConfig() {
-  fs.writeFileSync(WELCOME_CONFIG_FILE, JSON.stringify(welcomeConfig, null, 2));
-}
-
 // Load commands dynamically
 const commands = new Map();
-const commandsDir = path.join(__dirname, 'commands');
+const commandsDir = path.join(__dirname, 'horlapookie');
 const commandFiles = fs
   .readdirSync(commandsDir)
   .filter((f) => f.endsWith('.js'));
@@ -66,14 +48,14 @@ for (const file of commandFiles) {
 }
 
 async function startBot() {
-  const sessionFolder = path.join(__dirname, 'Success');
+  const sessionFolder = path.join(__dirname, 'auth_info');
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
     version,
     auth: state,
-    printQRInTerminal: !fs.existsSync(path.join(sessionFolder, 'creds.json')),
+    printQRInTerminal: false,
     logger: pino({ level: 'silent' }),
     browser: ['Ubuntu', 'Chrome', '20.0.04'],
   });
@@ -94,59 +76,6 @@ async function startBot() {
     }
   });
 
-  // Welcome and goodbye messages
-  sock.ev.on('group-participants.update', async (update) => {
-    try {
-      const groupId = update.id;
-      if (!welcomeConfig[groupId]?.enabled) return;
-
-      for (const participant of update.participants) {
-        const contactId = participant.split('@')[0];
-        let text = '';
-
-        if (update.action === 'add') {
-          const welcomeMsg = welcomeConfig[groupId].welcomeMessage || 'Welcome @user 🎉';
-          text = welcomeMsg.replace(/@user/g, `@${contactId}`);
-        } else if (update.action === 'remove') {
-          const goodbyeMsg = welcomeConfig[groupId].goodbyeMessage || 'Goodbye @user 😢';
-          text = goodbyeMsg.replace(/@user/g, `@${contactId}`);
-        }
-
-        if (text) {
-          await sock.sendMessage(groupId, {
-            text,
-            mentions: [participant],
-          });
-        }
-      }
-    } catch (e) {
-      console.error('Error handling group participants update:', e);
-    }
-  });
-
-  // Helper function to announce bot ON status in all groups
-  async function announceBotOn() {
-    try {
-      // Fetch all chats
-      const allChats = await sock.groupFetchAllParticipating();
-      for (const groupId in allChats) {
-        try {
-          const group = allChats[groupId];
-          const participants = group.participants.map(p => p.id);
-          // Compose mention text tagging all participants
-          const mentionText = participants.map(p => `@${p.split('@')[0]}`).join(' ');
-          await sock.sendMessage(groupId, {
-            text: `✅ Bot has been activated and is now online!\n${mentionText}`,
-            mentions: participants,
-          });
-        } catch (e) {
-          console.error(`Failed to announce in group ${groupId}:`, e);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to fetch groups for announcement:', e);
-    }
-  }
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify' || !messages.length) return;
@@ -195,8 +124,6 @@ async function startBot() {
     if (commandName === 'on' && senderNumber === OWNER_NUMBER) {
       botActive = true;
       await sock.sendMessage(remoteJid, { text: '✅ Bot activated by owner.' }, { quoted: msg });
-      // Announce in all groups
-      await announceBotOn();
       return;
     }
 
@@ -227,11 +154,7 @@ async function startBot() {
       await command.execute(msg, {
         sock,
         args,
-        moderators,
-        saveModerators,
         OWNER_NUMBER,
-        welcomeConfig,
-        saveWelcomeConfig,
       });
     } catch (err) {
       console.error(`Error executing command ${commandName}:`, err);

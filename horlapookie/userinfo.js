@@ -6,7 +6,7 @@ export default {
   description: 'Get info about a user by replying or tagging',
   async execute(msg, { sock, moderators, isOwner }) {
     try {
-      const bannedPath = path.join(process.cwd(), 'banned.json');
+      const bannedPath = path.join(process.cwd(), 'database/json/banned.json');
       const banned = fs.existsSync(bannedPath) ? JSON.parse(fs.readFileSync(bannedPath)) : {};
 
       // Get target user from reply or mention
