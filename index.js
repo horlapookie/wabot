@@ -73,12 +73,20 @@ const commandFiles = fs
 for (const file of commandFiles) {
   try {
     const imported = await import(`file://${path.join(commandsDir, file)}`);
+    
+    // Handle default export
     const command = imported.default;
     if (command && command.name && typeof command.execute === 'function') {
       commands.set(command.name, command);
       console.log(`Loaded command: ${command.name}`);
-    } else {
-      console.log(`Skipping file (invalid command structure): ${file}`);
+    }
+    
+    // Handle named exports (for groups.js individual commands)
+    for (const [key, value] of Object.entries(imported)) {
+      if (key !== 'default' && value && value.name && typeof value.execute === 'function') {
+        commands.set(value.name, value);
+        console.log(`Loaded command: ${value.name}`);
+      }
     }
   } catch (err) {
     console.error(`Failed to load command ${file}:`, err);
