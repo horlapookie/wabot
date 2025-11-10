@@ -16,8 +16,15 @@ const COMMAND_PREFIX = '$';
 const OWNER_NUMBER = '2348028336218';
 
 const BANNED_FILE = path.join(__dirname, 'database/json/banned.json');
+const MODERATORS_FILE = path.join(__dirname, 'database/json/moderators.json');
 
 let botActive = true;
+
+function loadModerators() {
+  return fs.existsSync(MODERATORS_FILE)
+    ? JSON.parse(fs.readFileSync(MODERATORS_FILE))
+    : [];
+}
 
 function loadBanned() {
   return fs.existsSync(BANNED_FILE)
@@ -160,10 +167,12 @@ async function startBot() {
     }
 
     try {
+      const moderators = loadModerators();
       await command.execute(msg, {
         sock,
         args,
         OWNER_NUMBER,
+        moderators,
       });
     } catch (err) {
       console.error(`Error executing command ${commandName}:`, err);
