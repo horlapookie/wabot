@@ -13,6 +13,38 @@ import { handleLinkDetection } from './horlapookie/antilink.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  const message = args.join(' ');
+  
+  if (
+    message.includes('Failed to decrypt message') ||
+    message.includes('Session error') ||
+    message.includes('Bad MAC') ||
+    message.includes('Closing open session') ||
+    message.includes('Closing session:')
+  ) {
+    return;
+  }
+  
+  originalConsoleError.apply(console, args);
+};
+
+const originalConsoleLog = console.log;
+console.log = (...args) => {
+  const message = args.join(' ');
+  
+  if (
+    message.includes('Closing open session') ||
+    message.includes('Closing session:') ||
+    message.includes('SessionEntry')
+  ) {
+    return;
+  }
+  
+  originalConsoleLog.apply(console, args);
+};
+
 const COMMAND_PREFIX = '$';
 let OWNER_NUMBER = '2348028336218'; // Default fallback
 
