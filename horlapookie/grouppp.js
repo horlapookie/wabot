@@ -13,7 +13,8 @@ export default {
 
     const metadata = await sock.groupMetadata(remoteJid);
     const participants = metadata.participants;
-    const isSenderAdmin = participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
+    const admins = participants.filter(p => p.admin !== null).map(p => p.id);
+    const isSenderAdmin = admins.includes(sender);
 
     if (!isSenderAdmin) {
       return await sock.sendMessage(remoteJid, { text: '❌ Only group admins can fetch the group profile picture.' }, { quoted: msg });
