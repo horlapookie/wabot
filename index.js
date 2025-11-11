@@ -8,6 +8,7 @@ import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { handleLinkDetection } from './horlapookie/antilink.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -163,6 +164,11 @@ async function startBot() {
     const messageType = Object.keys(msg.message)[0];
     if (messageType === 'conversation') body = msg.message.conversation;
     else if (messageType === 'extendedTextMessage') body = msg.message.extendedTextMessage.text;
+
+    // Check for antilink in groups (before command processing)
+    if (isGroup && body) {
+      await handleLinkDetection(sock, remoteJid, msg, body, senderJid);
+    }
 
     if (!body.startsWith(COMMAND_PREFIX)) return;
 
