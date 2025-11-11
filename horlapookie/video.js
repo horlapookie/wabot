@@ -2,9 +2,9 @@ import yts from 'yt-search';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import axios from 'axios';
+import ytdl from '@distube/ytdl-core';
 import { getEmojis } from '../lib/emojis.js';
-import { extractVideoId, downloadVideoAPI, downloadWithYtdl } from '../lib/mediaHelper.js';
+import { extractVideoId } from '../lib/mediaHelper.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +37,17 @@ export default {
 
             if (searchQuery.startsWith('http://') || searchQuery.startsWith('https://')) {
                 videoUrl = searchQuery;
+                try {
+                    const info = await ytdl.getInfo(videoUrl);
+                    videoTitle = info.videoDetails.title;
+                } catch (e) {
+                    videoTitle = 'Video';
+                }
             } else {
+                await sock.sendMessage(chatId, {
+                    text: `${emojis.search} Searching for: *${searchQuery}*...`
+                }, { quoted: msg });
+
                 const { videos } = await yts(searchQuery);
                 if (!videos || videos.length === 0) {
                     return await sock.sendMessage(chatId, {
@@ -48,116 +58,85 @@ export default {
                 videoTitle = videos[0].title || searchQuery;
             }
 
-            try {
-                const ytId = extractVideoId(videoUrl);
-                const thumbUrl = ytId ? `https://i.ytimg.com/vi/${ytId}/maxresdefault.jpg` : undefined;
-                const displayTitle = videoTitle || searchQuery || 'Video';
+            const ytId = extractVideoId(videoUrl);
+            const thumbUrl = ytId ? `https://i.ytimg.com/vi/${ytId}/maxresdefault.jpg` : undefined;
 
-                if (thumbUrl) {
-                    await sock.sendMessage(chatId, {
-                        image: { url: thumbUrl },
-                        caption: `${emojis.video} *${displayTitle}*\n\n${emojis.processing} Processing your video request...`
-                    }, { quoted: msg });
-                }
-            } catch (e) {
-                console.error('[VIDEO] Error sending preview:', e?.message || e);
-            }
-
-            let videoResult;
-            try {
-                console.log('[VIDEO] Attempting video API...');
-                videoResult = await downloadVideoAPI(videoUrl);
-
-                if (!videoResult.status) {
-                    throw new Error('Video API failed');
-                }
-                console.log('[VIDEO] Video API success');
-            } catch (apiErr) {
-                console.error(`[VIDEO] Video API failed:`, apiErr?.message || apiErr);
-
-                try {
-                    console.log('[VIDEO] Trying ytdl-core fallback...');
-                    const tempDir = path.join(__dirname, '../temp');
-                    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-                    const tempFile = path.join(tempDir, `${Date.now()}.mp4`);
-
-                    const stream = await downloadWithYtdl(videoUrl, false);
-                    
-                    await new Promise(async (resolve, reject) => {
-                        const ffmpeg = (await import('fluent-ffmpeg')).default;
-                        ffmpeg(stream)
-                            .videoBitrate(1024)
-                            .toFormat('mp4')
-                            .save(tempFile)
-                            .on('end', resolve)
-                            .on('error', reject);
-                    });
-
-                    await sock.sendMessage(chatId, {
-                        video: { url: tempFile },
-                        mimetype: "video/mp4",
-                        caption: `${emojis.video} *${videoTitle || 'Video'}*`
-                    }, { quoted: msg });
-
-                    setTimeout(() => {
-                        try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch {}
-                    }, 2000);
-
-                    await sock.sendMessage(chatId, {
-                        react: { text: emojis.success, key: msg.key }
-                    });
-
-                    return;
-                } catch (fbErr) {
-                    console.error('[VIDEO] ytdl-core fallback failed:', fbErr?.message || fbErr);
-                    return await sock.sendMessage(chatId, {
-                        text: `${emojis.error} All download methods failed. Please try again later.`
-                    }, { quoted: msg });
-                }
-            }
-
-            if (videoResult && videoResult.status && videoResult.result?.download) {
-                const tempDir = path.join(__dirname, '../temp');
-                if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-                const tempFile = path.join(tempDir, `${Date.now()}_video.mp4`);
-
-                const response = await axios({
-                    url: videoResult.result.download,
-                    method: 'GET',
-                    responseType: 'stream',
-                    timeout: 120000,
-                    maxRedirects: 5
-                });
-
-                await new Promise((resolve, reject) => {
-                    const writer = fs.createWriteStream(tempFile);
-                    response.data.pipe(writer);
-                    writer.on('finish', resolve);
-                    writer.on('error', reject);
-                });
-
-                if (!fs.existsSync(tempFile) || fs.statSync(tempFile).size < 1024) {
-                    throw new Error('Downloaded file is invalid or too small');
-                }
-
+            if (thumbUrl) {
                 await sock.sendMessage(chatId, {
-                    video: { url: tempFile },
-                    mimetype: 'video/mp4',
-                    caption: `${emojis.video} *${videoResult.result.title || videoTitle || 'Video'}*`
+                    image: { url: thumbUrl },
+                    caption: `${emojis.video} *${videoTitle}*\n\n${emojis.download} Downloading video...`
                 }, { quoted: msg });
+            }
 
-                await sock.sendMessage(chatId, {
-                    react: { text: emojis.success, key: msg.key }
+            console.log('[VIDEO] Downloading with ytdl-core:', videoUrl);
+            
+            const tempDir = path.join(__dirname, '../temp');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+            const tempFile = path.join(tempDir, `${Date.now()}.mp4`);
+
+            const info = await ytdl.getInfo(videoUrl);
+            const formats = ytdl.filterFormats(info.formats, 'audioandvideo');
+            
+            if (!formats.length) {
+                throw new Error('No video formats available');
+            }
+
+            await new Promise(async (resolve, reject) => {
+                const ffmpeg = (await import('fluent-ffmpeg')).default;
+                
+                const stream = ytdl(videoUrl, {
+                    quality: 'highest',
+                    filter: format => format.container === 'mp4'
                 });
 
-                setTimeout(() => {
-                    try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch {}
-                }, 2000);
+                ffmpeg(stream)
+                    .videoCodec('libx264')
+                    .audioCodec('aac')
+                    .format('mp4')
+                    .outputOptions([
+                        '-preset fast',
+                        '-crf 28'
+                    ])
+                    .on('error', (err) => {
+                        console.error('[VIDEO] FFmpeg error:', err);
+                        reject(err);
+                    })
+                    .on('end', () => {
+                        console.log('[VIDEO] Conversion completed');
+                        resolve();
+                    })
+                    .save(tempFile);
+            });
+
+            if (!fs.existsSync(tempFile) || fs.statSync(tempFile).size < 1024) {
+                throw new Error('Downloaded file is invalid or too small');
             }
+
+            await sock.sendMessage(chatId, {
+                video: { url: tempFile },
+                mimetype: "video/mp4",
+                caption: `${emojis.video} *${videoTitle}*`
+            }, { quoted: msg });
+
+            await sock.sendMessage(chatId, {
+                react: { text: emojis.success, key: msg.key }
+            });
+
+            setTimeout(() => {
+                try {
+                    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+                } catch (e) {
+                    console.error('[VIDEO] Cleanup error:', e);
+                }
+            }, 5000);
+
         } catch (error) {
             console.error('[VIDEO] Error:', error);
             await sock.sendMessage(chatId, {
-                text: `${emojis.error} An error occurred while processing your request. Please try again later.`
+                react: { text: emojis.error, key: msg.key }
+            });
+            await sock.sendMessage(chatId, {
+                text: `${emojis.error} Failed to download video: ${error.message}\n\nPlease try again or use a different video.`
             }, { quoted: msg });
         }
     }
