@@ -5,7 +5,7 @@ export const music = {
   name: 'music',
   description: 'Search and play music from YouTube',
   async execute(sock, chatId, args, message) {
-    if (args.length === 0) {
+    if (!args || args.length === 0) {
       await sock.sendMessage(chatId, {
         text: '❌ Please provide a song name\nExample: $music seyi vibez'
       });
@@ -67,7 +67,7 @@ export const video = {
   name: 'video',
   description: 'Search and download video from YouTube',
   async execute(sock, chatId, args, message) {
-    if (args.length === 0) {
+    if (!args || args.length === 0) {
       await sock.sendMessage(chatId, {
         text: '❌ Please provide a video name\nExample: $video seyi vibez'
       });

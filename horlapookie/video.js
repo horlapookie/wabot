@@ -74,7 +74,17 @@ export default {
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             const tempFile = path.join(tempDir, `${Date.now()}.mp4`);
 
-            const info = await ytdl.getInfo(videoUrl);
+            const ytdlOptions = {
+                requestOptions: {
+                    headers: {
+                        'cookie': 'VISITOR_INFO1_LIVE=; PREF=f1=50000000&tz=UTC; YSC=',
+                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'accept-language': 'en-US,en;q=0.9'
+                    }
+                }
+            };
+
+            const info = await ytdl.getInfo(videoUrl, ytdlOptions);
             const formats = ytdl.filterFormats(info.formats, 'audioandvideo');
             
             if (!formats.length) {
@@ -86,7 +96,8 @@ export default {
                 
                 const stream = ytdl(videoUrl, {
                     quality: 'highest',
-                    filter: format => format.container === 'mp4'
+                    filter: format => format.container === 'mp4',
+                    ...ytdlOptions
                 });
 
                 ffmpeg(stream)
