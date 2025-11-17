@@ -2,9 +2,9 @@ import yts from 'yt-search';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import ytdl from '@distube/ytdl-core';
 import { getEmojis } from '../lib/emojis.js';
 import { extractVideoId } from '../lib/mediaHelper.js';
+import { downloadAudio, cleanupTempFile } from '../utils/ytDownloader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,12 +37,7 @@ export default {
 
             if (searchQuery.startsWith('http://') || searchQuery.startsWith('https://')) {
                 videoUrl = searchQuery;
-                try {
-                    const info = await ytdl.getInfo(videoUrl);
-                    songTitle = info.videoDetails.title;
-                } catch (e) {
-                    songTitle = 'Song';
-                }
+                songTitle = 'Song';
             } else {
                 await sock.sendMessage(chatId, {
                     text: `${emojis.search} Searching for: *${searchQuery}*...`
@@ -68,61 +63,22 @@ export default {
                 }, { quoted: msg });
             }
 
-            console.log('[PLAY] Downloading with ytdl-core:', videoUrl);
-            
-            const tempDir = path.join(__dirname, '../temp');
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            const tempFile = path.join(tempDir, `${Date.now()}.mp3`);
+            console.log('[PLAY] Downloading with ytDownloader:', videoUrl);
 
-            const ytdlOptions = {
-                requestOptions: {
-                    headers: {
-                        'cookie': 'VISITOR_INFO1_LIVE=; PREF=f1=50000000&tz=UTC; YSC=',
-                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'accept-language': 'en-US,en;q=0.9'
-                    }
-                }
-            };
+            const downloadResult = await downloadAudio(videoUrl);
 
-            const info = await ytdl.getInfo(videoUrl, ytdlOptions);
-            const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
-            
-            if (!audioFormats.length) {
-                throw new Error('No audio formats available');
+            if (!downloadResult.success) {
+                throw new Error(downloadResult.error || 'Download failed');
             }
 
-            await new Promise(async (resolve, reject) => {
-                const ffmpeg = (await import('fluent-ffmpeg')).default;
-                
-                const stream = ytdl(videoUrl, {
-                    quality: 'highestaudio',
-                    filter: 'audioonly',
-                    ...ytdlOptions
-                });
-
-                ffmpeg(stream)
-                    .audioBitrate(128)
-                    .audioCodec('libmp3lame')
-                    .toFormat('mp3')
-                    .on('error', (err) => {
-                        console.error('[PLAY] FFmpeg error:', err);
-                        reject(err);
-                    })
-                    .on('end', () => {
-                        console.log('[PLAY] Conversion completed');
-                        resolve();
-                    })
-                    .save(tempFile);
-            });
-
-            if (!fs.existsSync(tempFile) || fs.statSync(tempFile).size < 1024) {
-                throw new Error('Downloaded file is invalid or too small');
+            if (!fs.existsSync(downloadResult.path)) {
+                throw new Error('Downloaded file not found');
             }
 
             await sock.sendMessage(chatId, {
-                audio: { url: tempFile },
+                audio: { url: downloadResult.path },
                 mimetype: "audio/mpeg",
-                fileName: `${songTitle}.mp3`,
+                fileName: `${downloadResult.title || songTitle}.mp3`,
                 ptt: false
             }, { quoted: msg });
 
@@ -131,11 +87,7 @@ export default {
             });
 
             setTimeout(() => {
-                try {
-                    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-                } catch (e) {
-                    console.error('[PLAY] Cleanup error:', e);
-                }
+                cleanupTempFile(downloadResult.path);
             }, 5000);
 
         } catch (error) {

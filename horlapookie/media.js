@@ -44,11 +44,16 @@ export const music = {
     }
 
     try {
+      if (!fs.existsSync(downloadResult.path)) {
+        throw new Error('Downloaded file not found');
+      }
+
       const audioBuffer = fs.readFileSync(downloadResult.path);
       
       await sock.sendMessage(chatId, {
         audio: audioBuffer,
         mimetype: 'audio/mpeg',
+        fileName: `${downloadResult.title}.mp3`,
         ptt: false
       }, { quoted: msg });
 
@@ -108,6 +113,10 @@ export const video = {
     }
 
     try {
+      if (!fs.existsSync(downloadResult.path)) {
+        throw new Error('Downloaded file not found');
+      }
+
       const videoBuffer = fs.readFileSync(downloadResult.path);
       
       await sock.sendMessage(chatId, {
@@ -168,6 +177,10 @@ export const audio = {
     }
 
     try {
+      if (!fs.existsSync(downloadResult.path)) {
+        throw new Error('Downloaded file not found');
+      }
+
       const audioBuffer = fs.readFileSync(downloadResult.path);
       
       await sock.sendMessage(chatId, {
@@ -232,6 +245,10 @@ export const videofile = {
     }
 
     try {
+      if (!fs.existsSync(downloadResult.path)) {
+        throw new Error('Downloaded file not found');
+      }
+
       const videoBuffer = fs.readFileSync(downloadResult.path);
       
       await sock.sendMessage(chatId, {

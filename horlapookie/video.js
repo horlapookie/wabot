@@ -2,9 +2,9 @@ import yts from 'yt-search';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import ytdl from '@distube/ytdl-core';
 import { getEmojis } from '../lib/emojis.js';
 import { extractVideoId } from '../lib/mediaHelper.js';
+import { downloadVideo, cleanupTempFile } from '../utils/ytDownloader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,12 +37,7 @@ export default {
 
             if (searchQuery.startsWith('http://') || searchQuery.startsWith('https://')) {
                 videoUrl = searchQuery;
-                try {
-                    const info = await ytdl.getInfo(videoUrl);
-                    videoTitle = info.videoDetails.title;
-                } catch (e) {
-                    videoTitle = 'Video';
-                }
+                videoTitle = 'Video';
             } else {
                 await sock.sendMessage(chatId, {
                     text: `${emojis.search} Searching for: *${searchQuery}*...`
@@ -68,65 +63,22 @@ export default {
                 }, { quoted: msg });
             }
 
-            console.log('[VIDEO] Downloading with ytdl-core:', videoUrl);
-            
-            const tempDir = path.join(__dirname, '../temp');
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            const tempFile = path.join(tempDir, `${Date.now()}.mp4`);
+            console.log('[VIDEO] Downloading with ytDownloader:', videoUrl);
 
-            const ytdlOptions = {
-                requestOptions: {
-                    headers: {
-                        'cookie': 'VISITOR_INFO1_LIVE=; PREF=f1=50000000&tz=UTC; YSC=',
-                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'accept-language': 'en-US,en;q=0.9'
-                    }
-                }
-            };
+            const downloadResult = await downloadVideo(videoUrl);
 
-            const info = await ytdl.getInfo(videoUrl, ytdlOptions);
-            const formats = ytdl.filterFormats(info.formats, 'audioandvideo');
-            
-            if (!formats.length) {
-                throw new Error('No video formats available');
+            if (!downloadResult.success) {
+                throw new Error(downloadResult.error || 'Download failed');
             }
 
-            await new Promise(async (resolve, reject) => {
-                const ffmpeg = (await import('fluent-ffmpeg')).default;
-                
-                const stream = ytdl(videoUrl, {
-                    quality: 'highest',
-                    filter: format => format.container === 'mp4',
-                    ...ytdlOptions
-                });
-
-                ffmpeg(stream)
-                    .videoCodec('libx264')
-                    .audioCodec('aac')
-                    .format('mp4')
-                    .outputOptions([
-                        '-preset fast',
-                        '-crf 28'
-                    ])
-                    .on('error', (err) => {
-                        console.error('[VIDEO] FFmpeg error:', err);
-                        reject(err);
-                    })
-                    .on('end', () => {
-                        console.log('[VIDEO] Conversion completed');
-                        resolve();
-                    })
-                    .save(tempFile);
-            });
-
-            if (!fs.existsSync(tempFile) || fs.statSync(tempFile).size < 1024) {
-                throw new Error('Downloaded file is invalid or too small');
+            if (!fs.existsSync(downloadResult.path)) {
+                throw new Error('Downloaded file not found');
             }
 
             await sock.sendMessage(chatId, {
-                video: { url: tempFile },
+                video: { url: downloadResult.path },
                 mimetype: "video/mp4",
-                caption: `${emojis.video} *${videoTitle}*`
+                caption: `${emojis.video} *${downloadResult.title || videoTitle}*`
             }, { quoted: msg });
 
             await sock.sendMessage(chatId, {
@@ -134,11 +86,7 @@ export default {
             });
 
             setTimeout(() => {
-                try {
-                    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-                } catch (e) {
-                    console.error('[VIDEO] Cleanup error:', e);
-                }
+                cleanupTempFile(downloadResult.path);
             }, 5000);
 
         } catch (error) {
