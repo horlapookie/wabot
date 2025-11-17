@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleLinkDetection } from './horlapookie/antilink.js';
+import { loadSessionFromFile } from './session.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -127,6 +128,9 @@ for (const file of commandFiles) {
 }
 
 async function startBot() {
+  // Load session from session-id file if it exists (before initializing auth)
+  loadSessionFromFile();
+  
   // Detect and set bot owner number from creds
   OWNER_NUMBER = getBotOwnerNumber();
   
