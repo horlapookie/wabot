@@ -144,7 +144,7 @@ async function startBot() {
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
+  sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
       if (code !== DisconnectReason.loggedOut) {
@@ -155,6 +155,44 @@ async function startBot() {
       }
     } else if (connection === 'open') {
       console.log('Bot is online!');
+      
+      // Send connection message to owner
+      try {
+        const images = ['menu1.jpg', 'menu2.jpg'];
+        const randomImage = images[Math.floor(Math.random() * images.length)];
+        const imagePath = path.join(__dirname, 'images', randomImage);
+        
+        const connectionMessage = `╔═══════════════════════╗
+║   *TOSHIRO MD MINI BOT*   ║
+╚═══════════════════════╝
+
+✅ *Bot Connected Successfully!*
+
+🤖 *Bot Name:* TOSHIRO MD MINI
+📝 *Prefix:* ${COMMAND_PREFIX}
+👤 *Owner:* ${OWNER_NUMBER}
+
+🔥 *All systems online and ready!*
+Type *${COMMAND_PREFIX}menu* to see all commands.
+
+╔═══════════════════════╗
+║   *Made with ❤️*          ║
+╚═══════════════════════╝`;
+
+        if (fs.existsSync(imagePath)) {
+          const imageBuffer = fs.readFileSync(imagePath);
+          await sock.sendMessage(`${OWNER_NUMBER}@s.whatsapp.net`, {
+            image: imageBuffer,
+            caption: connectionMessage
+          });
+        } else {
+          await sock.sendMessage(`${OWNER_NUMBER}@s.whatsapp.net`, {
+            text: connectionMessage
+          });
+        }
+      } catch (error) {
+        console.error('Error sending connection message:', error.message);
+      }
     }
   });
 
